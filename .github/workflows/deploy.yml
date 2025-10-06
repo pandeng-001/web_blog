@@ -16,6 +16,7 @@ jobs:
           key: ${{ secrets.DEPLOY_KEY }}
           script: |
             set -e                 # 任何一步失败就退出
+            export DJANGO_SECRET_KEY="${{ secrets.DJANGO_SECRET_KEY }}"
             cd /home/django/blog/web_blog
             git pull origin main
             source blog/bin/activate
