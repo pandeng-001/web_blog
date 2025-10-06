@@ -1,0 +1,112 @@
+{% extends 'base.html' %}
+{% block title %}
+{% if category %}{{ category.name }}{% else %}最新文章{% endif %}
+{% endblock %}
+{% load static %}
+
+{% block content %}
+<div class="layui-container">
+    <div class="layui-row layui-col-space20">
+        <!-- 左侧文章列表 -->
+        <div class="layui-col-md9">
+            {% for art in page_obj %}
+            <a href="{% url 'resume:article_detail' art.pk %}" style="text-decoration:none;">
+                <div class="layui-card" style="margin-bottom:15px;transition:.3s;cursor:pointer;"
+                    onMouseOver="this.style.boxShadow='0 4px 12px rgba(0,0,0,.1)'" onMouseOut="this.style.boxShadow=''">
+                    <div class="layui-card-body" style="padding:15px 20px;">
+                        <!-- 标题 -->
+                        <h3 style="margin:0 0 8px;font-size:18px;font-weight:bold;">
+                            <span style="color:#333;text-decoration:none;"
+                                onMouseOver="this.style.color='#1E9FFF';this.style.textDecoration='underline'"
+                                onMouseOut="this.style.color='#333';this.style.textDecoration='none'">
+                                {{ art.title }}
+                            </span>
+                        </h3>
+                        <!-- 一行内属性 -->
+                        <div style="font-size:12px;color:#999;">
+                            <span class="layui-badge layui-bg-blue">{{ art.category.name }}</span>
+                            <span style="margin-left:15px;"><i class="layui-icon layui-icon-date"></i> {{ art.created_at|date:'Y-m-d' }}</span>
+                            <span style="margin-left:15px;"><i class="layui-icon layui-icon-fire"></i> {{ art.views }}
+                                次阅读</span>
+                        </div>
+                        <!-- 摘要（可选） -->
+                        {% if art.summary %}
+                        <p
+                            style="margin:8px 0 0;color:#666;font-size:14px;line-height:1.6;height:2.4em;overflow:hidden;">
+                            {{ art.summary|truncatechars:100 }}
+                        </p>
+                        {% endif %}
+                    </div>
+                </div>
+            </a>
+            {% empty %}
+            <p>暂无文章</p>
+            {% endfor %}
+
+            <!-- 分页 -->
+            <div class="layui-box layui-laypage">
+                {% if page_obj.has_previous %}
+                <a href="?page={{ page_obj.previous_page_number }}" class="layui-laypage-prev">上一页</a>
+                {% endif %}
+                {% for num in page_obj.paginator.page_range %}
+                {% if num == page_obj.number %}
+                <span class="layui-laypage-curr"><em class="layui-laypage-em"></em><em>{{ num }}</em></span>
+                {% else %}
+                <a href="?page={{ num }}">{{ num }}</a>
+                {% endif %}
+                {% endfor %}
+                {% if page_obj.has_next %}
+                <a href="?page={{ page_obj.next_page_number }}" class="layui-laypage-next">下一页</a>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- 右侧边栏 -->
+        <div class="layui-col-md3">
+            <!-- 文章分类 -->
+            <div class="layui-card">
+                <div class="layui-card-header">
+                    <i class="layui-icon layui-icon-list"></i> 文章分类
+                </div>
+                <div class="layui-card-body" style="padding:10px;">
+                    <div class="layui-row layui-col-space5">
+                        {% for c in categories %}
+                        <div class="layui-col-xs4 layui-col-sm4 layui-col-md12" style="margin-bottom:5px;">
+                            <a href="{% url 'resume:category' c.slug %}"
+                                class="layui-btn {% if category.slug == c.slug %}layui-btn-normal{% else %}layui-btn-primary{% endif %} layui-btn-fluid layui-btn-sm">
+                                {{ c.name }}
+                            </a>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- 方形日历 - 今日信息 -->
+            <div class="layui-card">
+                <div class="layui-card-header">
+                    <i class="layui-icon layui-icon-date"></i> 今日
+                </div>
+                <div class="layui-card-body" style="padding:10px;text-align:center;">
+                    <div id="todayCal"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 日历初始化 -->
+<script src="{% static 'layui-v2.11.6/layui/layui.js' %}"></script>
+<script>
+    layui.use('laydate', function (laydate) {
+        laydate.render({
+            elem: '#todayCal',
+            type: 'date',
+            value: new Date(),
+            position: 'static',
+            showBottom: false,
+            done: function (value, date) { /* 点击日期可跳转（可选） */ }
+        });
+    });
+</script>
+{% endblock %}

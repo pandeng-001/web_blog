@@ -1,0 +1,97 @@
+{% extends 'base.html' %}
+{% block title %}{{ article.title }}{% endblock %}
+{% block content %}
+{% load static %}
+<div class="layui-container">
+    <div class="layui-row layui-col-space20" style="align-items: flex-start;">
+        <!-- 左侧大纲 -->
+        <div class="layui-col-md3">
+            <!-- 外层负责占位高度 -->
+            <div class="toc-wrapper">
+                <!-- 内层负责固定/复位 -->
+                <div class="toc-sticky">
+                    <div class="layui-card toc-card">
+                        <div class="layui-card-header style="font-weight:bold;"> 
+                             目录</div>
+                        <div class="layui-card-body" id="toc">
+                            <!-- 由 JS 自动提取 h1-h6 生成 -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 右侧正文 -->
+        <div class="layui-col-md9">
+            <div class="layui-card">
+                <div class="layui-card-header">
+                    <h1>{{ article.title }}</h1>
+                    <small>{{ article.created_at|date:"Y-m-d H:i" }} · {{ article.views }} 次阅读</small>
+                </div>
+                <div class="layui-card-body markdown-body">
+                    {{ article.content_html|safe }}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="{% static 'layui-v2.11.6/layui/layui.js' %}"></script>
+<script>
+    layui.use(['jquery'], function ($) {
+        const toc = $('#toc');
+        $('.markdown-body :header').each(function (idx) {
+            const id = this.id || 'h-' + idx;
+            $(this).attr('id', id);
+            toc.append(
+                `<a href="#${id}" class="toc-link" style="display:block;padding:4px 0;padding-left:${(parseInt(this.tagName.substr(1)) - 1) * 15}px">${$(this).text()}</a>`
+            );
+        });
+
+        // 平滑滚动 + 高亮当前标题（可选）
+        $(document).on('click', '.toc-link', function (e) {
+            e.preventDefault();
+            $('html,body').animate({ scrollTop: $($(this).attr('href')).offset().top - 70 }, 300);
+        });
+    });
+</script>
+
+<!-- 美化的固定样式 -->
+<style>
+    /* 占位高度 = 目录原始高度，防止跳动 */
+    .toc-wrapper {
+        position: relative;
+    }
+
+    /* 固定逻辑：滑到顶部瞬间贴住导航栏 */
+    .toc-sticky {
+        position: sticky;
+        top: 60px;
+        align-self: start;
+    }
+
+    /* 视觉美化：圆角 + 阴影 + 悬停微动 */
+    .toc-card {
+        border-radius: 6px;
+        overflow: hidden;
+        transition: .3s;
+    }
+
+    .toc-card:hover {
+        box-shadow: 0 4px 12px rgba(0, 0, 0, .08);
+    }
+
+    /* 目录链接样式 */
+    #toc a {
+        color: #555;
+        text-decoration: none;
+        display: block;
+        padding: 4px 0;
+    }
+
+    #toc a:hover {
+        color: #1E9FFF;
+    }
+</style>
+
+{% endblock %}

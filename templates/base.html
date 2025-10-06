@@ -1,0 +1,211 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% block title %}个人空间{% endblock %}</title>
+    <link rel="stylesheet" href="{% static 'layui-v2.11.6/layui/css/layui.css' %}">
+    <link rel="stylesheet" href="{% static 'md-css/github-markdown.min.css' %}">
+    <link rel="stylesheet" href="{% static 'css/main.css' %}">
+    {% block extra_head %}{% endblock %}
+
+    <!-- 抽屉专用样式 -->
+    <style>
+        /* 遮罩 */
+        .drawer-mask {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, .45);
+            z-index: 9998;
+            display: none;
+        }
+
+        /* 抽屉容器 - 左侧滑出 */
+        .drawer-panel {
+            position: fixed;
+            top: 0;
+            left: 0;
+            height: 100%;
+            width: 260px;
+            background: #fff;
+            z-index: 9999;
+            transform: translateX(-100%);
+            transition: transform .3s ease;
+        }
+
+        .drawer-panel.show {
+            transform: translateX(0);
+        }
+
+        /* 抽屉头部 */
+        .drawer-header {
+            padding: 15px 20px;
+            border-bottom: 1px solid #f1f1f1;
+            font-size: 16px;
+            font-weight: bold;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        /* 关闭按钮 */
+        .drawer-close {
+            cursor: pointer;
+            font-size: 18px;
+            color: #666;
+        }
+
+        /* 小屏才出现抽屉按钮 */
+        @media (min-width:768px) {
+            #btnDrawer {
+                display: none;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <!-- 顶部导航 -->
+    <nav class="layui-header layui-bg-black">
+        <div class="layui-container">
+            <a class="layui-logo" href="{% url 'resume:index' %}">个人博客</a>
+
+            <!-- 大屏水平导航 -->
+            <ul class="layui-nav layui-layout-right layui-hide-xs">
+                <li class="layui-nav-item {% if not category and not series %}layui-this{% endif %}">
+                    <a href="{% url 'resume:index' %}">首页</a>
+                </li>
+                {% for c in categories %}
+                <li class="layui-nav-item {% if category.slug == c.slug %}layui-this{% endif %}">
+                    <a href="{% url 'resume:category' c.slug %}">{{ c.name }}</a>
+                </li>
+                {% endfor %}
+                <li class="layui-nav-item">
+                    <a href="javascript:;">文章系列</a>
+                    <dl class="layui-nav-child">
+                        {% for s in series_list %}
+                        <dd {% if series.slug == s.slug %}class="layui-this" {% endif %}>
+                            <a href="{% url 'resume:series' s.slug %}">{{ s.name }}</a>
+                        </dd>
+                        {% endfor %}
+                    </dl>
+                </li>
+            </ul>
+
+            <!-- 小屏三点 → 改触发抽屉 -->
+            <a href="javascript:;" id="btnDrawer"
+                class="layui-icon layui-icon-more-vertical layui-hide-sm layui-show-xs-inline-block"
+                style="color:#fff;font-size:20px;float:right;line-height:60px;"></a>
+        </div>
+    </nav>
+
+    <!-- 抽屉 -->
+    <div class="drawer-mask" id="drawerMask"></div>
+    <div class="drawer-panel" id="drawerPanel">
+        <!-- 去掉头部 -->
+        <ul class="layui-nav layui-nav-tree layui-nav-side" lay-filter="drawerNav"
+            style="margin-top:0;border-radius:0;">
+            <li class="layui-nav-item {% if not category and not series %}layui-this{% endif %}">
+                <a href="{% url 'resume:index' %}">首页</a>
+            </li>
+            {% for c in categories %}
+            <li class="layui-nav-item {% if category.slug == c.slug %}layui-this{% endif %}">
+                <a href="{% url 'resume:category' c.slug %}">{{ c.name }}</a>
+            </li>
+            {% endfor %}
+            <li class="layui-nav-item">
+                <a href="javascript:;">文章系列</a>
+                <dl class="layui-nav-child">
+                    {% for s in series_list %}
+                    <dd {% if series.slug == s.slug %}class="layui-this" {% endif %}>
+                        <a href="{% url 'resume:series' s.slug %}">{{ s.name }}</a>
+                    </dd>
+                    {% endfor %}
+                </dl>
+            </li>
+        </ul>
+    </div>
+
+    <main>{% block content %}{% endblock %}</main>
+
+    <!-- 底部粘性栏 -->
+    <footer class="layui-bg-black"
+        style="position:fixed;bottom:0;left:0;right:0;height:45px;z-index:9999;display:flex;align-items:center;justify-content:center;gap:6px;">
+        <span style="color:#ccc;font-size:12px;">© 2025 · All rights reserved.</span>
+        <a href="https://github.com/pandeng-001" target="_blank" class="layui-icon layui-icon-github"
+            style="color:#fff;font-size:18px;" title="GitHub"></a>
+        <a href="mailto:1912936908@qq.com" class="layui-icon layui-icon-email" style="color:#fff;font-size:18px;"
+            title="Email"></a>
+        <a href="https://gitee.com/keep01" target="_blank" class="layui-icon layui-icon-gitee"
+            style="color:#fff;font-size:18px;" title="Gitee"></a>
+    </footer>
+
+    <script src="{% static 'layui-v2.11.6/layui/layui.js' %}"></script>
+    <script>
+        layui.use(['jquery', 'element'], function ($, element) {
+            /* 打开抽屉 */
+            $('#btnDrawer').on('click', function () {
+                $('#drawerMask').fadeIn(200);
+                $('#drawerPanel').addClass('show');
+                element.render('nav', 'drawerNav');   // 渲染子菜单
+            });
+
+            /* 关闭抽屉（点遮罩或×） */
+            $('#drawerMask, #drawerClose').on('click', function () {
+                $('#drawerMask').fadeOut(200);
+                $('#drawerPanel').removeClass('show');
+            });
+        });
+
+        layui.use('util', function (util) {
+            // fixbar 会自动在右下生成返回顶部图标
+            util.fixbar({
+                bar1: false,          // 不使用扩展按钮
+                css: { right: 15, bottom: 60 }, // 底部留 60px（避开你的 45px 粘性栏）
+                bgcolor: '#5FB878',   // 图标背景色（layui 绿）
+                showHeight: 100       // 滚动 100px 才出现
+            });
+        });
+    </script>
+
+
+
+    <style>
+        body {
+            padding-bottom: 50px;
+        }
+    </style>
+    <style>
+        /* === 导航树与抽屉完全重合 === */
+        .drawer-panel .layui-nav-tree {
+            width: 100% !important;
+            /* 填满抽屉 */
+            height: 100% !important;
+            /* 填满抽屉 */
+            background: #2F3338 !important;
+            /* 同色背景 */
+            border-right: none !important;
+            /* 去掉右边框 */
+            border-radius: 0 !important;
+            /* 去掉圆角 */
+            padding: 0 !important;
+            /* 去掉内边距 */
+            margin: 0 !important;
+            /* 去掉外边距 */
+        }
+
+        /* 移除 Layui 自带顶部间距 */
+        .drawer-panel .layui-nav-tree>.layui-nav-item:first-child {
+            margin-top: 0;
+        }
+    </style>
+
+    {% block extra_js %}{% endblock %}
+</body>
+
+</html>

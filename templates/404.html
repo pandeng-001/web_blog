@@ -1,0 +1,45 @@
+{% load static %}
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>404 - 页面不见了</title>
+    <link rel="stylesheet" href="{% static 'layui-v2.11.6/layui/css/layui.css' %}">
+    
+    <style>
+        html,body{height:100%}
+        .lay-blog-404{
+            display:flex;
+            align-items:center;
+            justify-content:center;
+            height:100%;
+            background:#f2f2f2;
+        }
+        .lay-blog-404 .layui-card{
+            width:500px;
+            text-align:center;
+            padding:40px 0;
+        }
+        .lay-blog-404 .layui-card .num{
+            font-size:120px;
+            color:#009688;
+            font-weight:600;
+        }
+        .lay-blog-404 .layui-card .desc{
+            color:#777;
+            font-size:18px;
+            margin:15px 0 30px;
+        }
+    </style>
+</head>
+<body class="layui-layout-body">
+    <div class="lay-blog-404">
+        <div class="layui-card">
+            <div class="num">404</div>
+            <div class="desc">抱歉，你访问的页面不见了</div>
+            <a href="javascript:history.back();" class="layui-btn layui-btn-primary">返回上一页</a>
+            <a href="{% url 'resume:index' %}" class="layui-btn layui-btn-normal">回首页</a>
+        </div>
+    </div>
+</body>
+</html>

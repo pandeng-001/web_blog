@@ -1,0 +1,178 @@
+{% extends 'base.html' %}
+{% load static %}
+{% block title %}{{ series.name }} · {{ article.title|default:'文章系列' }}{% endblock %}
+
+{% block content %}
+<div class="layui-container">
+    <div class="layui-row layui-col-space20">
+        <!-- 左侧：文章列表 -->
+        <div class="layui-col-md3">
+            <!-- 文章系列 -->
+            <div class="layui-card series-card">
+                <div class="layui-card-header" style="font-weight:bold;">
+                    <i class="layui-icon layui-icon-list"></i> {{ series.name }} 系列
+                </div>
+                <div class="layui-card-body" style="padding:10px;">
+                    <ul class="layui-menu" id="series-menu">
+                        {% for art in articles %}
+                        <li class="{% if art.pk == article.pk %}layui-this{% endif %}">
+                            <a href="{% url 'resume:series_article' series.slug art.pk %}" data-pk="{{ art.pk }}">
+                                {{ art.title }}
+                            </a>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            </div>
+
+            <!-- 目录 -->
+            <div class="layui-card toc-card" style="margin-top:15px;">
+                <div class="layui-card-header" style="font-weight:bold;">
+                    <i class="layui-icon layui-icon-list"></i> 目录
+                </div>
+                <div class="layui-card-body">
+                    <nav id="toc"></nav>
+                </div>
+            </div>
+        </div>
+
+        <!-- 右侧：文章内容 -->
+        <div class="layui-col-md9">
+            <div class="layui-card">
+                <div class="layui-card-header">
+                    <h1 id="article-title">{{ article.title|default:'请选择左侧文章' }}</h1>
+                </div>
+                <div class="layui-card-body markdown-body" id="article-content">
+                    {% if article %}
+                    {{ article.content_html|safe }}
+                    {% else %}
+                    <p class="layui-text-center layui-text">点击左侧标题加载内容</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    /* 统一在 JS 里拼前缀，避免硬编码路径 */
+    const SERIES_SLUG = '{{ series.slug }}';
+
+    /* 加载指定文章 -> 更新标题 + 内容 + 目录 */
+    function loadArticle(pk) {
+        fetch(`/resume/series/${SERIES_SLUG}/article/${pk}/api`)
+            .then(r => r.json())
+            .then(data => {
+                document.getElementById('article-title').innerText = data.title;
+                const contentBox = document.getElementById('article-content');
+                contentBox.innerHTML = data.content_html;
+                buildToc();
+                history.replaceState(null, data.title, `/resume/series/${SERIES_SLUG}/article/${pk}/`);
+            });
+    }
+
+    /* 生成目录 */
+    function buildToc() {
+        layui.use(['jquery'], function ($) {
+            const toc = $('#toc').empty();
+            $('.markdown-body :header').each(function (idx) {
+                const lvl = parseInt(this.tagName.substr(1));
+                const id = this.id || 'h-' + idx;
+                $(this).attr('id', id);
+                toc.append(
+                    `<a href="#${id}" class="toc-link" style="display:block;padding:4px 0;padding-left:${(lvl - 1) * 15}px">${$(this).text()}</a>`
+                );
+            });
+            $(document).off('click.toc').on('click.toc', '.toc-link', function (e) {
+                e.preventDefault();
+                const target = $(this.getAttribute('href'));
+                $('html,body').animate({ scrollTop: target.offset().top - 70 }, 300);
+            });
+        });
+    }
+
+    /* 左侧列表点击无刷新 */
+    layui.use(['jquery'], function ($) {
+        $('#series-menu a').on('click', function (e) {
+            e.preventDefault();
+            const pk = $(this).data('pk');
+            loadArticle(pk);
+        });
+    });
+
+    /* 左侧列表点击无刷新：文字 + 整行 */
+    layui.use(['jquery'], function ($) {
+        // 文字
+        $('#series-menu a').on('click', function (e) {
+            e.preventDefault();
+            loadArticle($(this).data('pk'));
+        });
+
+        // 整行（li）
+        $('#series-menu li').on('click', function (e) {
+            // 如果点的已经是 a，就不管；否则帮它触发
+            if (e.target.tagName.toLowerCase() === 'a') return;
+            const pk = $(this).find('a').data('pk');
+            loadArticle(pk);
+        });
+    });
+
+    /* 首屏就生成目录 */
+    {% if article %} buildToc(); {% endif %}
+</script>
+
+<style>
+    /* 目录 & 文章系列 卡片共用 hover 效果 */
+    .toc-card,
+    .layui-card:has(#series-menu) {
+        /* 包含系列菜单的卡片 */
+        transition: .3s;
+        cursor: pointer;
+    }
+
+    .toc-card:hover,
+    .layui-card:has(#series-menu):hover {
+        box-shadow: 0 4px 12px rgba(0, 0, 0, .1);
+    }
+
+    /* 目录链接悬停下划线 */
+    #toc a {
+        color: #555;
+        text-decoration: none;
+        display: block;
+        padding: 4px 0;
+        transition: color .2s;
+    }
+
+    #toc a:hover {
+        color: #1E9FFF;
+        text-decoration: underline;
+    }
+
+    /* 系列文章列表 - 整行 hover 阴影 + 文字下划线 */
+    #series-menu li {
+        transition: background-color .2s;
+    }
+
+    #series-menu li:hover {
+        background-color: #f8f8f8;
+        /* 行背景变色 */
+    }
+
+    #series-menu a {
+        color: #333;
+        text-decoration: none;
+        display: block;
+        padding: 6px 10px;
+        transition: color .2s;
+    }
+
+    #series-menu a:hover {
+        color: #1E9FFF;
+        text-decoration: underline;
+    }
+</style>
+
+{% endblock %}

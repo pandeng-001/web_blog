@@ -1,0 +1,118 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<!-- 纯色背景 -->
+<div class="hero-bg">
+    <div class="layui-container">
+        <!-- 轮播图卡片 -->
+        <div class="layui-card layui-panel">
+            <div class="layui-card-header"><h2>MY BLOG</h2></div>
+            <div class="layui-card-body" style="padding:0;">
+                <div class="layui-carousel" id="indexCarousel" style="border-radius:6px;overflow:hidden;">
+                    <div carousel-item>
+                        <div><img src="{% static 'banner_images/banner1.jpg' %}" alt="" style="width:100%;height:280px;object-fit:cover;"></div>
+                        <div><img src="{% static 'banner_images/banner2.jpg' %}" alt="" style="width:100%;height:280px;object-fit:cover;"></div>
+                        <div><img src="{% static 'banner_images/banner3.jpg' %}" alt="" style="width:100%;height:280px;object-fit:cover;"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+
+  <!-- 置顶文章 -->
+  {% if pinned %}
+  <div class="layui-card layui-panel" style="margin-bottom:20px;">
+    <div class="layui-card-header">
+      <i class="layui-icon layui-icon-top" style="color:#FF5722;"></i> 置顶文章
+    </div>
+    <div class="layui-card-body" style="padding:0;">
+      {% for art in pinned %}
+      <a href="{% url 'resume:article_detail' art.pk %}" style="text-decoration:none;">
+        <div class="blog-row" style="padding:18px 20px;border-bottom:1px solid #f1f1f1;transition:.2s;">
+          <h3 style="font-weight:bold;margin:0;font-size:18px;color:#333;">
+            {{ art.title }}
+          </h3>
+          {% if art.summary %}
+          <p style="color:#666;font-size:14px;line-height:1.7;margin:8px 0 0;max-height:2.4em;overflow:hidden;">
+            {{ art.summary|truncatechars:120 }}
+          </p>
+          {% endif %}
+          <div style="margin-top:10px;font-size:12px;color:#999;">
+            <span class="layui-badge layui-bg-blue">{{ art.category.name }}</span>
+            <span style="margin-left:15px;"><i class="layui-icon layui-icon-date"></i> {{ art.created_at|date:'Y-m-d' }}</span>
+            <span style="margin-left:15px;"><i class="layui-icon layui-icon-fire"></i> {{ art.views }}</span>
+          </div>
+        </div>
+      </a>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+<div class="layui-card layui-panel">
+  <div class="layui-card-header"><h3>最新文章</h3></div>
+  <div class="layui-card-body" style="padding:0;">
+    {% for art in latest %}
+    <a href="{% url 'resume:article_detail' art.pk %}" style="text-decoration:none;">
+      <div class="blog-row" style="display:flex;justify-content:space-between;align-items:center;padding:18px 20px;border-bottom:1px solid #f1f1f1;transition:.2s;">
+        <!-- 左侧内容 -->
+        <div style="flex:1;min-width:0;">
+          <h4 style="font-weight:bold;margin:0 0 6px;font-size:17px;color:#333;">
+            {{ art.title }}
+          </h4>
+
+        </div>
+        <!-- 右侧信息列 -->
+        <div style="margin-left:20px;text-align:right;white-space:nowrap;font-size:12px;color:#999;">
+          <!-- <div class="layui-badge layui-bg-blue">{{ art.category.name }}</div> -->
+          <div style="margin-top:5px;"><i class="layui-icon layui-icon-date"></i> {{ art.created_at|date:'Y-m-d' }}</div>
+          <!-- <div style="margin-top:3px;"><i class="layui-icon layui-icon-fire"></i> {{ art.views }}</div> -->
+        </div>
+      </div>
+    </a>
+    {% empty %}
+    <p style="text-align:center;color:#999;padding:20px 0;">暂无文章</p>
+    {% endfor %}
+  </div>
+</div>
+
+<!-- 悬停效果 -->
+<style>
+.blog-row:hover{background:#fafafa;}
+.blog-row h4:hover{color:#1E9FFF;text-decoration:underline;}
+</style>
+
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<!-- 1. 先保证导航已渲染 -->
+<script>
+layui.use(['jquery','element'], function($, element){
+    element.render('nav','flexNav');          // 把小屏菜单重新渲染一次
+});
+</script>
+
+<style>
+.blog-row:hover{background:#fafafa;}
+.blog-row h3:hover{color:#1E9FFF;text-decoration:underline;}
+</style>
+
+<!-- 2. 再初始化轮播 -->
+<script>
+layui.use('carousel', function(){
+    var carousel = layui.carousel;
+    carousel.render({
+        elem: '#indexCarousel',
+        width: '100%',
+        height: '280px',
+        interval: 3000,
+        autoplay: true,
+        arrow: 'hover',
+        indicator: 'inside'
+    });
+});
+</script>
+{% endblock %}

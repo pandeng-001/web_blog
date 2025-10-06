@@ -1,0 +1,9 @@
+/* static/css/main.css */
+body{margin:0;background:#f6f6f6;}
+.hero-bg{
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    padding: 60px 0;
+}
+.layui-panel{background:#fff;border-radius:4px;box-shadow:0 2px 10px rgba(0,0,0,.1);}
+.article-item{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #f2f2f2;}
+.article-item:last-child{border-bottom:none;}
