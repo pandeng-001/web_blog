@@ -8,7 +8,13 @@
 
 ```python
 # 创建虚拟环境
+conda  creat -n blog
+conda activate blog
+# 安装包
+pip install -r requirements.txt
 
+# 运行程序
+python manage.py runserver
 ```
 
 ## 演示

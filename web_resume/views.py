@@ -27,7 +27,7 @@ from django.http import JsonResponse
 
 def index(request):
     pinned = Article.objects.filter(is_pinned=True)[:3]          # 最多 3 篇置顶
-    latest = Article.objects.filter(is_pinned=False)[:2]        # 普通最新
+    latest = Article.objects.filter(is_pinned=False)[:10]        # 普通最新
     return render(request, 'resume/index.html', {'pinned': pinned, 'latest': latest})
 
 # —— 系列首页 ——
