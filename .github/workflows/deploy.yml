@@ -15,10 +15,11 @@ jobs:
           username: django
           key: ${{ secrets.DEPLOY_KEY }}
           script: |
+            set -e                 # 任何一步失败就退出
             cd /home/django/blog/web_blog
             git pull origin main
             source blog/bin/activate
             pip install -r requirements.txt
             python manage.py migrate --noinput
             python manage.py collectstatic --noinput
-            sudo supervisorctl restart web_blog
+            sudo /usr/bin/supervisorctl restart web_blog
