@@ -15,6 +15,7 @@ local_settings.py
 settings/local.py
 media/
 static_collected/
+staticfiles/
 
 # 安全
 .env
