@@ -16,10 +16,12 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path, include
+from captcha.views import captcha_refresh
 
 urlpatterns = [
-    path('admin/', admin.site.urls),
-    path("resume/", include("web_resume.urls")),
+    path('login/', admin.site.urls),
+    path("blog/", include("web_resume.urls")),
+    path('captcha/', include('captcha.urls')),            # 生成验证码
 ]
 
 from django.conf import settings

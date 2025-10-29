@@ -26,7 +26,9 @@ env = environ.Env()
 environ.Env.read_env(os.path.join(BASE_DIR, '.env'))
 SECRET_KEY    = env('SECRET_KEY')
 DEBUG         = env.bool('DEBUG', default=False)
+# DEBUG         = True
 ALLOWED_HOSTS = env.list('ALLOWED_HOSTS')
+# ALLOWED_HOSTS= ["127.0.0.1"]
 
 
 #ALLOWED_HOSTS = ['*']
@@ -42,13 +44,13 @@ CSRF_COOKIE_SECURE = True
 # DEBUG = True
 #DEBUG = False
 
-# ALLOWED_HOSTS = ['*'] 
-
 
 # Application definition
 
 INSTALLED_APPS = [
+    'multi_captcha_admin',         # 添加 必须放在 django.contrib.admin 前面
     'django.contrib.admin',
+    'captcha',                     # 添加
     'django.contrib.auth',
     'django.contrib.contenttypes',
     'django.contrib.sessions',
@@ -57,8 +59,15 @@ INSTALLED_APPS = [
     'web_resume'
 ]
 
+MULTI_CAPTCHA_ADMIN = {
+    'engine': 'simple-captcha',     # 还可选 recaptcha / recaptcha2 等
+}
+
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'middleware.rate_limit.SecurityHeadersMiddleware',      # 安全响应头
+    'middleware.rate_limit.RateLimitMiddleware',            # 流量控制
+    'middleware.rate_limit.AccessLogMiddleware',            # 访问日志
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -169,3 +178,129 @@ STATIC_URL = 'static/'
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+# ==================== Redis 缓存配置 ====================
+CACHES = {
+    'default': {
+        'BACKEND': 'django_redis.cache.RedisCache',
+        'LOCATION': 'redis://127.0.0.1:6379/1',
+        'OPTIONS': {
+            'CLIENT_CLASS': 'django_redis.client.DefaultClient',
+            'CONNECTION_POOL_KWARGS': {
+                'max_connections': 50,
+                'decode_responses': True,
+            }
+        },
+        'KEY_PREFIX': 'myproject',
+        'TIMEOUT': 300,
+    }
+}
+
+# ==================== 限流配置 ====================
+RATE_LIMIT_ENABLED = True              # 启用限流
+RATE_LIMIT_REQUESTS = 100              # 每分钟最多100个请求
+RATE_LIMIT_WINDOW = 60                 # 60秒时间窗口
+LOGIN_RATE_LIMIT = 5                   # 登录尝试5次
+LOGIN_RATE_WINDOW = 300                # 5分钟限制
+RATE_LIMIT_WHITELIST = ['127.0.0.1']   # IP白名单
+
+# ==================== 日志配置 ====================
+# 确保日志目录存在
+LOGS_DIR = BASE_DIR / 'logs'
+if not LOGS_DIR.exists():
+    LOGS_DIR.mkdir(parents=True)
+
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    
+    # 日志格式
+    'formatters': {
+        'verbose': {
+            'format': '[{levelname}] {asctime} {module} - {message}',
+            'style': '{',
+            'datefmt': '%Y-%m-%d %H:%M:%S',
+        },
+        'simple': {
+            'format': '[{levelname}] {message}',
+            'style': '{',
+        },
+        'access': {
+            'format': '{message}',
+            'style': '{',
+        },
+    },
+    
+    # 日志处理器
+    'handlers': {
+        # 访问日志 - 记录所有正常访问
+        'access_file': {
+            'level': 'INFO',
+            'class': 'logging.handlers.RotatingFileHandler',
+            'filename': LOGS_DIR / 'access.log',
+            'maxBytes': 10 * 1024 * 1024,  # 10MB 自动切割
+            'backupCount': 30,              # 保留30个文件
+            'formatter': 'access',
+            'encoding': 'utf-8',
+        },
+        
+        # 错误日志 - 记录 4xx, 5xx 错误
+        'error_file': {
+            'level': 'WARNING',
+            'class': 'logging.handlers.RotatingFileHandler',
+            'filename': LOGS_DIR / 'error.log',
+            'maxBytes': 10 * 1024 * 1024,
+            'backupCount': 30,
+            'formatter': 'verbose',
+            'encoding': 'utf-8',
+        },
+        
+        # Django 系统日志
+        'django_file': {
+            'level': 'INFO',
+            'class': 'logging.handlers.RotatingFileHandler',
+            'filename': LOGS_DIR / 'django.log',
+            'maxBytes': 10 * 1024 * 1024,
+            'backupCount': 10,
+            'formatter': 'verbose',
+            'encoding': 'utf-8',
+        },
+        
+        # 控制台输出（开发环境）
+        'console': {
+            'level': 'INFO',
+            'class': 'logging.StreamHandler',
+            'formatter': 'simple',
+        },
+    },
+    
+    # 日志记录器
+    'loggers': {
+        # 访问日志记录器
+        'access': {
+            'handlers': ['access_file'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        
+        # Django 框架日志
+        'django': {
+            'handlers': ['django_file', 'console'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        
+        # 你的应用日志（可选）
+        'web_resume': {
+            'handlers': ['django_file', 'console'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+    },
+    
+    # 根日志记录器
+    'root': {
+        'handlers': ['console', 'error_file'],
+        'level': 'INFO',
+    },
+}
