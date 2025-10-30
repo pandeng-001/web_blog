@@ -19,4 +19,4 @@ python manage.py runserver
 
 ## 演示
 
-[demo演示](http://117.72.211.78/resume/)
+[demo演示](http://117.72.211.78/blog/)
