@@ -3,46 +3,56 @@
 {% block title %}{{ series.name }} · {{ article.title|default:'文章系列' }}{% endblock %}
 
 {% block content %}
-<div class="layui-container">
+<div class="layui-container" style="margin-top:20px;">
     <div class="layui-row layui-col-space20">
-        <!-- 左侧：文章列表 -->
+        <!-- 左侧：文章列表 + 目录 -->
         <div class="layui-col-md3">
-            <!-- 文章系列 -->
-            <div class="layui-card series-card">
-                <div class="layui-card-header" style="font-weight:bold;">
-                    <i class="layui-icon layui-icon-list"></i> {{ series.name }} 系列
+            <!-- 🔥 外层容器实现 sticky 固定 -->
+            <div class="sidebar-container">
+                <!-- 文章系列 -->
+                <div class="layui-card series-card">
+                    <div class="layui-card-header" style="font-weight:bold;background:#f8f8f8;">
+                        <i class="layui-icon layui-icon-list"></i> {{ series.name }} 系列
+                    </div>
+                    <div class="layui-card-body" style="padding:10px;">
+                        <ul class="series-menu-custom" id="series-menu">
+                            {% for art in articles %}
+                            <li class="{% if art.pk == article.pk %}active-item{% endif %}">
+                                <a href="{% url 'resume:series_article' series.slug art.pk %}" data-pk="{{ art.pk }}">
+                                    {{ art.title }}
+                                </a>
+                            </li>
+                            {% endfor %}
+                        </ul>
+                    </div>
                 </div>
-                <div class="layui-card-body" style="padding:10px;">
-                    <ul class="layui-menu" id="series-menu">
-                        {% for art in articles %}
-                        <li class="{% if art.pk == article.pk %}layui-this{% endif %}">
-                            <a href="{% url 'resume:series_article' series.slug art.pk %}" data-pk="{{ art.pk }}">
-                                {{ art.title }}
-                            </a>
-                        </li>
-                        {% endfor %}
-                    </ul>
-                </div>
-            </div>
 
-            <!-- 目录 -->
-            <div class="layui-card toc-card" style="margin-top:15px;">
-                <div class="layui-card-header" style="font-weight:bold;">
-                    <i class="layui-icon layui-icon-list"></i> 目录
-                </div>
-                <div class="layui-card-body">
-                    <nav id="toc"></nav>
+                <!-- 目录 -->
+                <div class="layui-card toc-card" style="margin-top:15px;">
+                    <div class="layui-card-header" style="font-weight:bold;background:#f8f8f8;">
+                        <i class="layui-icon layui-icon-list"></i> 目录
+                    </div>
+                    <div class="layui-card-body" style="padding:15px;">
+                        <nav id="toc">
+                            <div style="text-align:center;color:#999;padding:20px 0;">
+                                <i class="layui-icon layui-icon-loading layui-anim layui-anim-rotate layui-anim-loop"></i>
+                                <div>加载目录中...</div>
+                            </div>
+                        </nav>
+                    </div>
                 </div>
             </div>
         </div>
 
         <!-- 右侧：文章内容 -->
         <div class="layui-col-md9">
-            <div class="layui-card">
-                <div class="layui-card-header">
-                    <h1 id="article-title">{{ article.title|default:'请选择左侧文章' }}</h1>
+            <div class="layui-card article-card">
+                <div class="layui-card-header" style="background:#fff;border-bottom:1px solid #eee;">
+                    <h1 id="article-title" style="margin:0;font-size:28px;line-height:1.5;">
+                        {{ article.title|default:'请选择左侧文章' }}
+                    </h1>
                 </div>
-                <div class="layui-card-body markdown-body" id="article-content">
+                <div class="layui-card-body markdown-body" id="article-content" style="padding:30px;line-height:1.8;">
                     {% if article %}
                     {{ article.content_html|safe }}
                     {% else %}
@@ -53,6 +63,9 @@
         </div>
     </div>
 </div>
+
+<!-- 阅读进度条 -->
+<div class="reading-progress" id="readingProgress"></div>
 {% endblock %}
 
 {% block extra_js %}
@@ -62,116 +75,469 @@
 
     /* 加载指定文章 -> 更新标题 + 内容 + 目录 */
     function loadArticle(pk) {
-        fetch(`/resume/series/${SERIES_SLUG}/article/${pk}/api`)
+        fetch(`/blog/series/${SERIES_SLUG}/article/${pk}/api`)
             .then(r => r.json())
             .then(data => {
                 document.getElementById('article-title').innerText = data.title;
                 const contentBox = document.getElementById('article-content');
                 contentBox.innerHTML = data.content_html;
                 buildToc();
-                history.replaceState(null, data.title, `/resume/series/${SERIES_SLUG}/article/${pk}/`);
+                highlightCurrentSection();
+                history.replaceState(null, data.title, `/blog/series/${SERIES_SLUG}/article/${pk}/`);
+                
+                // 🔥 更新左侧选中状态
+                layui.use('jquery', function($) {
+                    $('#series-menu li').removeClass('active-item');
+                    $(`#series-menu a[data-pk="${pk}"]`).parent().addClass('active-item');
+                });
             });
     }
 
     /* 生成目录 */
     function buildToc() {
         layui.use(['jquery'], function ($) {
-            const toc = $('#toc').empty();
-            $('.markdown-body :header').each(function (idx) {
-                const lvl = parseInt(this.tagName.substr(1));
-                const id = this.id || 'h-' + idx;
-                $(this).attr('id', id);
-                toc.append(
-                    `<a href="#${id}" class="toc-link" style="display:block;padding:4px 0;padding-left:${(lvl - 1) * 15}px">${$(this).text()}</a>`
-                );
+            const $toc = $('#toc').empty();
+            const headers = $('#article-content').find('h1, h2, h3, h4, h5, h6');
+            
+            if (headers.length === 0) {
+                $toc.html('<div style="text-align:center;color:#999;padding:20px;">暂无目录</div>');
+                return;
+            }
+            
+            headers.each(function (idx) {
+                const $header = $(this);
+                const level = parseInt(this.tagName.substr(1));
+                const id = this.id || 'heading-' + idx;
+                const text = $header.text();
+                
+                // 设置ID（用于锚点跳转）
+                $header.attr('id', id);
+                
+                // 创建目录链接
+                const $link = $('<a></a>')
+                    .attr('href', '#' + id)
+                    .attr('data-level', level)
+                    .attr('data-id', id)
+                    .addClass('toc-link')
+                    .text(text);
+                
+                $toc.append($link);
             });
-            $(document).off('click.toc').on('click.toc', '.toc-link', function (e) {
-                e.preventDefault();
-                const target = $(this.getAttribute('href'));
-                $('html,body').animate({ scrollTop: target.offset().top - 70 }, 300);
-            });
+            
+            console.log('✅ 目录生成成功，共 ' + headers.length + ' 个标题');
         });
     }
 
-    /* 左侧列表点击无刷新 */
-    layui.use(['jquery'], function ($) {
-        $('#series-menu a').on('click', function (e) {
-            e.preventDefault();
-            const pk = $(this).data('pk');
-            loadArticle(pk);
+    /* 高亮当前阅读位置 */
+    function highlightCurrentSection() {
+        layui.use('jquery', function($) {
+            const headers = $('#article-content').find('h1, h2, h3, h4, h5, h6');
+            const scrollTop = $(window).scrollTop();
+            let currentId = '';
+            
+            headers.each(function () {
+                const $header = $(this);
+                const headerTop = $header.offset().top - 100;
+                
+                if (scrollTop >= headerTop) {
+                    currentId = $header.attr('id');
+                }
+            });
+            
+            // 移除所有active类
+            $('.toc-link').removeClass('active');
+            
+            // 添加active类到当前标题
+            if (currentId) {
+                const $activeLink = $('.toc-link[data-id="' + currentId + '"]');
+                $activeLink.addClass('active');
+                
+                // 自动滚动目录，确保当前项可见
+                const tocContainer = $('.toc-card .layui-card-body')[0];
+                const activeElement = $activeLink[0];
+                if (tocContainer && activeElement) {
+                    const containerRect = tocContainer.getBoundingClientRect();
+                    const elementRect = activeElement.getBoundingClientRect();
+                    
+                    if (elementRect.top < containerRect.top || elementRect.bottom > containerRect.bottom) {
+                        activeElement.scrollIntoView({ block: 'center', behavior: 'smooth' });
+                    }
+                }
+            }
         });
-    });
+    }
 
     /* 左侧列表点击无刷新：文字 + 整行 */
     layui.use(['jquery'], function ($) {
-        // 文字
+        // 文字点击
         $('#series-menu a').on('click', function (e) {
             e.preventDefault();
             loadArticle($(this).data('pk'));
         });
 
-        // 整行（li）
+        // 整行（li）点击
         $('#series-menu li').on('click', function (e) {
             // 如果点的已经是 a，就不管；否则帮它触发
             if (e.target.tagName.toLowerCase() === 'a') return;
             const pk = $(this).find('a').data('pk');
             loadArticle(pk);
         });
+        
+        // 目录点击平滑滚动
+        $(document).on('click', '.toc-link', function (e) {
+            e.preventDefault();
+            const targetId = $(this).attr('href');
+            const $target = $(targetId);
+            
+            if ($target.length) {
+                $('html, body').animate({
+                    scrollTop: $target.offset().top - 80
+                }, 400);
+            }
+        });
+        
+        // 滚动时更新高亮（使用节流优化性能）
+        let scrollTimer = null;
+        $(window).on('scroll', function () {
+            if (scrollTimer) clearTimeout(scrollTimer);
+            scrollTimer = setTimeout(function() {
+                highlightCurrentSection();
+                updateReadingProgress();
+            }, 50);
+        });
     });
 
+    /* 阅读进度条 */
+    function updateReadingProgress() {
+        const winScroll = document.documentElement.scrollTop || document.body.scrollTop;
+        const height = document.documentElement.scrollHeight - document.documentElement.clientHeight;
+        const scrolled = (winScroll / height) * 100;
+        
+        layui.use('jquery', function($) {
+            $('#readingProgress').css('width', scrolled + '%');
+        });
+    }
+
     /* 首屏就生成目录 */
-    {% if article %} buildToc(); {% endif %}
+    {% if article %} 
+    layui.use('jquery', function($) {
+        $(document).ready(function() {
+            setTimeout(function() {
+                buildToc();
+                highlightCurrentSection();
+                updateReadingProgress();
+                console.log('✅ 系列文章页初始化完成');
+            }, 100);
+        });
+    });
+    {% endif %}
 </script>
 
 <style>
-    /* 目录 & 文章系列 卡片共用 hover 效果 */
+    /* ============================================
+       🔥 关键修复：启用 Flex 布局（必须放最前面）
+    ============================================ */
+    .layui-row.layui-col-space20 {
+        display: flex !important;
+        flex-wrap: wrap;
+    }
+
+    .layui-col-md3,
+    .layui-col-md9 {
+        float: none !important;
+    }
+
+    /* ============================================
+       左侧边栏固定样式 - 关键修复
+    ============================================ */
+    .sidebar-container {
+        position: -webkit-sticky; /* Safari 兼容 */
+        position: sticky;
+        top: 20px; /* 距离顶部的距离 */
+        align-self: flex-start; /* 重要：让sticky在flex布局中生效 */
+        max-height: calc(100vh - 40px); /* 最大高度 */
+        overflow-y: auto; /* 内容过多时可滚动 */
+        z-index: 99;
+    }
+
+    /* 美化滚动条 */
+    .sidebar-container::-webkit-scrollbar {
+        width: 4px;
+    }
+
+    .sidebar-container::-webkit-scrollbar-thumb {
+        background: #ddd;
+        border-radius: 4px;
+    }
+
+    .sidebar-container::-webkit-scrollbar-thumb:hover {
+        background: #bbb;
+    }
+
+    /* ============================================
+       卡片样式
+    ============================================ */
+    .series-card,
     .toc-card,
-    .layui-card:has(#series-menu) {
-        /* 包含系列菜单的卡片 */
-        transition: .3s;
+    .article-card {
+        border-radius: 6px;
+        box-shadow: 0 2px 8px rgba(0,0,0,.05);
+        transition: all 0.3s;
+    }
+
+    .series-card:hover,
+    .toc-card:hover {
+        box-shadow: 0 4px 12px rgba(0,0,0,.1);
+        transform: translateY(-2px);
+    }
+
+    /* ============================================
+       系列文章列表样式 - 🔥 完全自定义，不依赖 layui
+    ============================================ */
+    .series-menu-custom {
+        margin: 0;
+        padding: 0;
+        list-style: none;
+    }
+
+    .series-menu-custom li {
+        transition: background-color .2s;
+        border-radius: 4px;
+        margin: 4px 0;
         cursor: pointer;
+        background-color: transparent;
     }
 
-    .toc-card:hover,
-    .layui-card:has(#series-menu):hover {
-        box-shadow: 0 4px 12px rgba(0, 0, 0, .1);
+    /* 普通项 hover */
+    .series-menu-custom li:hover {
+        background-color: #f0f9ff;
     }
 
-    /* 目录链接悬停下划线 */
+    /* 🔥 选中项背景 - 使用 active-item 而不是 layui-this */
+    .series-menu-custom li.active-item {
+        background-color: #1E9FFF !important;
+    }
+
+    /* 🔥 选中项 hover 时保持蓝色背景 */
+    .series-menu-custom li.active-item:hover {
+        background-color: #1E9FFF !important;
+    }
+
+    /* 默认文字颜色 */
+    .series-menu-custom a {
+        color: #555;
+        text-decoration: none;
+        display: block;
+        padding: 10px 12px;
+        transition: color .2s;
+        font-size: 14px;
+        line-height: 1.6;
+    }
+
+    /* 普通项 hover 时文字变蓝 */
+    .series-menu-custom li:not(.active-item):hover a {
+        color: #1E9FFF;
+    }
+
+    /* 🔥 选中项文字始终保持白色（即使 hover） */
+    .series-menu-custom li.active-item a {
+        color: #fff !important;
+        font-weight: bold;
+    }
+
+    /* ============================================
+       目录样式
+    ============================================ */
     #toc a {
         color: #555;
         text-decoration: none;
         display: block;
-        padding: 4px 0;
-        transition: color .2s;
+        padding: 8px 0 8px 10px;
+        border-left: 2px solid transparent;
+        margin-left: 0;
+        transition: all 0.2s;
+        font-size: 13px;
+        line-height: 1.6;
     }
 
     #toc a:hover {
         color: #1E9FFF;
-        text-decoration: underline;
+        background: #f0f9ff;
+        border-left-color: #1E9FFF;
     }
 
-    /* 系列文章列表 - 整行 hover 阴影 + 文字下划线 */
-    #series-menu li {
-        transition: background-color .2s;
-    }
-
-    #series-menu li:hover {
-        background-color: #f8f8f8;
-        /* 行背景变色 */
-    }
-
-    #series-menu a {
-        color: #333;
-        text-decoration: none;
-        display: block;
-        padding: 6px 10px;
-        transition: color .2s;
-    }
-
-    #series-menu a:hover {
+    /* 当前激活的目录项 */
+    #toc a.active {
         color: #1E9FFF;
-        text-decoration: underline;
+        font-weight: bold;
+        background: #f0f9ff;
+        border-left-color: #1E9FFF;
+    }
+
+    /* 目录层级缩进 */
+    #toc a[data-level="1"] { padding-left: 10px; }
+    #toc a[data-level="2"] { padding-left: 25px; }
+    #toc a[data-level="3"] { padding-left: 40px; }
+    #toc a[data-level="4"] { padding-left: 55px; }
+    #toc a[data-level="5"] { padding-left: 70px; }
+    #toc a[data-level="6"] { padding-left: 85px; }
+
+    /* ============================================
+       文章正文样式
+    ============================================ */
+    .markdown-body {
+        font-size: 16px;
+        color: #333;
+    }
+
+    .markdown-body h1,
+    .markdown-body h2,
+    .markdown-body h3,
+    .markdown-body h4,
+    .markdown-body h5,
+    .markdown-body h6 {
+        margin-top: 30px;
+        margin-bottom: 15px;
+        font-weight: bold;
+        color: #2c3e50;
+        scroll-margin-top: 80px; /* 锚点跳转时的偏移 */
+    }
+
+    .markdown-body h1 { 
+        font-size: 28px; 
+        border-bottom: 2px solid #eee; 
+        padding-bottom: 10px; 
+    }
+    
+    .markdown-body h2 { 
+        font-size: 24px; 
+        border-bottom: 1px solid #eee; 
+        padding-bottom: 8px; 
+    }
+    
+    .markdown-body h3 { font-size: 20px; }
+    .markdown-body h4 { font-size: 18px; }
+    .markdown-body h5 { font-size: 16px; }
+    .markdown-body h6 { font-size: 14px; color: #666; }
+
+    .markdown-body p {
+        margin: 15px 0;
+        line-height: 1.8;
+    }
+
+    .markdown-body code {
+        background: #f5f5f5;
+        padding: 2px 6px;
+        border-radius: 3px;
+        font-size: 14px;
+        color: #e96900;
+    }
+
+    .markdown-body pre {
+        background: #2d2d2d;
+        padding: 15px;
+        border-radius: 6px;
+        overflow-x: auto;
+        margin: 15px 0;
+    }
+
+    .markdown-body pre code {
+        color: #ccc;
+        background: none;
+    }
+
+    .markdown-body img {
+        max-width: 100%;
+        border-radius: 6px;
+        box-shadow: 0 2px 8px rgba(0,0,0,.1);
+        margin: 15px 0;
+        display: block;
+    }
+
+    .markdown-body blockquote {
+        border-left: 4px solid #1E9FFF;
+        background: #f0f9ff;
+        padding: 10px 15px;
+        margin: 15px 0;
+        color: #666;
+    }
+
+    .markdown-body ul, .markdown-body ol {
+        padding-left: 30px;
+        margin: 15px 0;
+    }
+
+    .markdown-body li {
+        margin: 8px 0;
+        line-height: 1.8;
+    }
+
+    .markdown-body table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 15px 0;
+    }
+
+    .markdown-body table th,
+    .markdown-body table td {
+        border: 1px solid #ddd;
+        padding: 10px;
+        text-align: left;
+    }
+
+    .markdown-body table th {
+        background: #f5f5f5;
+        font-weight: bold;
+    }
+
+    /* ============================================
+       阅读进度条
+    ============================================ */
+    .reading-progress {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 0%;
+        height: 3px;
+        background: linear-gradient(90deg, #1E9FFF, #5FB878);
+        z-index: 9999;
+        transition: width 0.1s ease;
+    }
+
+    /* ============================================
+       响应式设计
+    ============================================ */
+    @media screen and (max-width: 768px) {
+        .sidebar-container {
+            position: static; /* 移动端取消固定 */
+            max-height: none;
+            margin-bottom: 15px;
+        }
+
+        .markdown-body {
+            font-size: 15px;
+            padding: 20px !important;
+        }
+
+        #article-title {
+            font-size: 22px !important;
+        }
+    }
+
+    /* 页面加载动画 */
+    .series-card, .toc-card, .article-card {
+        animation: fadeInUp 0.5s ease-out;
+    }
+
+    @keyframes fadeInUp {
+        from {
+            opacity: 0;
+            transform: translateY(20px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
     }
 </style>
 
