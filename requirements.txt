@@ -1,8 +1,14 @@
 asgiref==3.9.1
 beautifulsoup4==4.13.5
 Django==5.2.5
+django-environ==0.12.0
+django-multi-captcha-admin==2.0.0
+django-ranged-response==0.2.0
+django-redis==6.0.0
+django-simple-captcha==0.6.2
 Markdown==3.8.2
 pillow==11.3.0
+redis==7.0.1
 soupsieve==2.8
 sqlparse==0.5.3
 typing_extensions==4.15.0
