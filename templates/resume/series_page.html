@@ -66,172 +66,6 @@
 
 <!-- 阅读进度条 -->
 <div class="reading-progress" id="readingProgress"></div>
-{% endblock %}
-
-{% block extra_js %}
-<script>
-    /* 统一在 JS 里拼前缀，避免硬编码路径 */
-    const SERIES_SLUG = '{{ series.slug }}';
-
-    /* 加载指定文章 -> 更新标题 + 内容 + 目录 */
-    function loadArticle(pk) {
-        fetch(`/blog/series/${SERIES_SLUG}/article/${pk}/api`)
-            .then(r => r.json())
-            .then(data => {
-                document.getElementById('article-title').innerText = data.title;
-                const contentBox = document.getElementById('article-content');
-                contentBox.innerHTML = data.content_html;
-                buildToc();
-                highlightCurrentSection();
-                history.replaceState(null, data.title, `/blog/series/${SERIES_SLUG}/article/${pk}/`);
-                
-                // 🔥 更新左侧选中状态
-                layui.use('jquery', function($) {
-                    $('#series-menu li').removeClass('active-item');
-                    $(`#series-menu a[data-pk="${pk}"]`).parent().addClass('active-item');
-                });
-            });
-    }
-
-    /* 生成目录 */
-    function buildToc() {
-        layui.use(['jquery'], function ($) {
-            const $toc = $('#toc').empty();
-            const headers = $('#article-content').find('h1, h2, h3, h4, h5, h6');
-            
-            if (headers.length === 0) {
-                $toc.html('<div style="text-align:center;color:#999;padding:20px;">暂无目录</div>');
-                return;
-            }
-            
-            headers.each(function (idx) {
-                const $header = $(this);
-                const level = parseInt(this.tagName.substr(1));
-                const id = this.id || 'heading-' + idx;
-                const text = $header.text();
-                
-                // 设置ID（用于锚点跳转）
-                $header.attr('id', id);
-                
-                // 创建目录链接
-                const $link = $('<a></a>')
-                    .attr('href', '#' + id)
-                    .attr('data-level', level)
-                    .attr('data-id', id)
-                    .addClass('toc-link')
-                    .text(text);
-                
-                $toc.append($link);
-            });
-            
-            console.log('✅ 目录生成成功，共 ' + headers.length + ' 个标题');
-        });
-    }
-
-    /* 高亮当前阅读位置 */
-    function highlightCurrentSection() {
-        layui.use('jquery', function($) {
-            const headers = $('#article-content').find('h1, h2, h3, h4, h5, h6');
-            const scrollTop = $(window).scrollTop();
-            let currentId = '';
-            
-            headers.each(function () {
-                const $header = $(this);
-                const headerTop = $header.offset().top - 100;
-                
-                if (scrollTop >= headerTop) {
-                    currentId = $header.attr('id');
-                }
-            });
-            
-            // 移除所有active类
-            $('.toc-link').removeClass('active');
-            
-            // 添加active类到当前标题
-            if (currentId) {
-                const $activeLink = $('.toc-link[data-id="' + currentId + '"]');
-                $activeLink.addClass('active');
-                
-                // 自动滚动目录，确保当前项可见
-                const tocContainer = $('.toc-card .layui-card-body')[0];
-                const activeElement = $activeLink[0];
-                if (tocContainer && activeElement) {
-                    const containerRect = tocContainer.getBoundingClientRect();
-                    const elementRect = activeElement.getBoundingClientRect();
-                    
-                    if (elementRect.top < containerRect.top || elementRect.bottom > containerRect.bottom) {
-                        activeElement.scrollIntoView({ block: 'center', behavior: 'smooth' });
-                    }
-                }
-            }
-        });
-    }
-
-    /* 左侧列表点击无刷新：文字 + 整行 */
-    layui.use(['jquery'], function ($) {
-        // 文字点击
-        $('#series-menu a').on('click', function (e) {
-            e.preventDefault();
-            loadArticle($(this).data('pk'));
-        });
-
-        // 整行（li）点击
-        $('#series-menu li').on('click', function (e) {
-            // 如果点的已经是 a，就不管；否则帮它触发
-            if (e.target.tagName.toLowerCase() === 'a') return;
-            const pk = $(this).find('a').data('pk');
-            loadArticle(pk);
-        });
-        
-        // 目录点击平滑滚动
-        $(document).on('click', '.toc-link', function (e) {
-            e.preventDefault();
-            const targetId = $(this).attr('href');
-            const $target = $(targetId);
-            
-            if ($target.length) {
-                $('html, body').animate({
-                    scrollTop: $target.offset().top - 80
-                }, 400);
-            }
-        });
-        
-        // 滚动时更新高亮（使用节流优化性能）
-        let scrollTimer = null;
-        $(window).on('scroll', function () {
-            if (scrollTimer) clearTimeout(scrollTimer);
-            scrollTimer = setTimeout(function() {
-                highlightCurrentSection();
-                updateReadingProgress();
-            }, 50);
-        });
-    });
-
-    /* 阅读进度条 */
-    function updateReadingProgress() {
-        const winScroll = document.documentElement.scrollTop || document.body.scrollTop;
-        const height = document.documentElement.scrollHeight - document.documentElement.clientHeight;
-        const scrolled = (winScroll / height) * 100;
-        
-        layui.use('jquery', function($) {
-            $('#readingProgress').css('width', scrolled + '%');
-        });
-    }
-
-    /* 首屏就生成目录 */
-    {% if article %} 
-    layui.use('jquery', function($) {
-        $(document).ready(function() {
-            setTimeout(function() {
-                buildToc();
-                highlightCurrentSection();
-                updateReadingProgress();
-                console.log('✅ 系列文章页初始化完成');
-            }, 100);
-        });
-    });
-    {% endif %}
-</script>
 
 <style>
     /* ============================================
@@ -505,15 +339,43 @@
     }
 
     /* ============================================
-       响应式设计
+       响应式设计 - 🔥 修复小屏宽度不一致问题
     ============================================ */
     @media screen and (max-width: 768px) {
+        /* 移动端取消固定定位 */
         .sidebar-container {
-            position: static; /* 移动端取消固定 */
+            position: static;
             max-height: none;
             margin-bottom: 15px;
         }
 
+        /* 🔥 关键修复：确保移动端宽度一致 */
+        .layui-container {
+            padding-left: 15px !important;
+            padding-right: 15px !important;
+        }
+
+        .layui-row.layui-col-space20 {
+            margin: 0 !important;
+        }
+
+        .layui-col-md3,
+        .layui-col-md9 {
+            width: 100% !important;
+            padding: 0 !important;
+            margin-bottom: 15px;
+        }
+
+        /* 🔥 确保卡片宽度一致 */
+        .series-card,
+        .toc-card,
+        .article-card {
+            width: 100%;
+            margin-left: 0;
+            margin-right: 0;
+        }
+
+        /* 调整移动端字体和间距 */
         .markdown-body {
             font-size: 15px;
             padding: 20px !important;
@@ -521,6 +383,45 @@
 
         #article-title {
             font-size: 22px !important;
+            padding: 15px !important;
+        }
+
+        .article-card .layui-card-header {
+            padding: 15px !important;
+        }
+
+        /* 系列列表移动端样式 */
+        .series-card .layui-card-body {
+            padding: 8px !important;
+        }
+
+        .series-menu-custom a {
+            font-size: 13px;
+            padding: 8px 10px;
+        }
+
+        /* 目录移动端样式 */
+        .toc-card .layui-card-body {
+            padding: 10px !important;
+        }
+
+        #toc a {
+            font-size: 12px;
+            padding: 6px 0 6px 8px;
+        }
+
+        /* 目录层级缩进（移动端缩小） */
+        #toc a[data-level="1"] { padding-left: 8px; }
+        #toc a[data-level="2"] { padding-left: 20px; }
+        #toc a[data-level="3"] { padding-left: 32px; }
+        #toc a[data-level="4"] { padding-left: 44px; }
+        #toc a[data-level="5"] { padding-left: 56px; }
+        #toc a[data-level="6"] { padding-left: 68px; }
+
+        /* 卡片头部移动端调整 */
+        .layui-card-header {
+            font-size: 14px !important;
+            padding: 12px 15px !important;
         }
     }
 
@@ -540,5 +441,170 @@
         }
     }
 </style>
+{% endblock %}
 
+{% block extra_js %}
+<script>
+    /* 统一在 JS 里拼前缀，避免硬编码路径 */
+    const SERIES_SLUG = '{{ series.slug }}';
+
+    /* 加载指定文章 -> 更新标题 + 内容 + 目录 */
+    function loadArticle(pk) {
+        fetch(`/blog/series/${SERIES_SLUG}/article/${pk}/api`)
+            .then(r => r.json())
+            .then(data => {
+                document.getElementById('article-title').innerText = data.title;
+                const contentBox = document.getElementById('article-content');
+                contentBox.innerHTML = data.content_html;
+                buildToc();
+                highlightCurrentSection();
+                history.replaceState(null, data.title, `/blog/series/${SERIES_SLUG}/article/${pk}/`);
+                
+                // 🔥 更新左侧选中状态
+                layui.use('jquery', function($) {
+                    $('#series-menu li').removeClass('active-item');
+                    $(`#series-menu a[data-pk="${pk}"]`).parent().addClass('active-item');
+                });
+            });
+    }
+
+    /* 生成目录 */
+    function buildToc() {
+        layui.use(['jquery'], function ($) {
+            const $toc = $('#toc').empty();
+            const headers = $('#article-content').find('h1, h2, h3, h4, h5, h6');
+            
+            if (headers.length === 0) {
+                $toc.html('<div style="text-align:center;color:#999;padding:20px;">暂无目录</div>');
+                return;
+            }
+            
+            headers.each(function (idx) {
+                const $header = $(this);
+                const level = parseInt(this.tagName.substr(1));
+                const id = this.id || 'heading-' + idx;
+                const text = $header.text();
+                
+                // 设置ID（用于锚点跳转）
+                $header.attr('id', id);
+                
+                // 创建目录链接
+                const $link = $('<a></a>')
+                    .attr('href', '#' + id)
+                    .attr('data-level', level)
+                    .attr('data-id', id)
+                    .addClass('toc-link')
+                    .text(text);
+                
+                $toc.append($link);
+            });
+            
+            console.log('✅ 目录生成成功，共 ' + headers.length + ' 个标题');
+        });
+    }
+
+    /* 高亮当前阅读位置 */
+    function highlightCurrentSection() {
+        layui.use('jquery', function($) {
+            const headers = $('#article-content').find('h1, h2, h3, h4, h5, h6');
+            const scrollTop = $(window).scrollTop();
+            let currentId = '';
+            
+            headers.each(function () {
+                const $header = $(this);
+                const headerTop = $header.offset().top - 100;
+                
+                if (scrollTop >= headerTop) {
+                    currentId = $header.attr('id');
+                }
+            });
+            
+            // 移除所有active类
+            $('.toc-link').removeClass('active');
+            
+            // 添加active类到当前标题
+            if (currentId) {
+                const $activeLink = $('.toc-link[data-id="' + currentId + '"]');
+                $activeLink.addClass('active');
+                
+                // 自动滚动目录，确保当前项可见
+                const tocContainer = $('.toc-card .layui-card-body')[0];
+                const activeElement = $activeLink[0];
+                if (tocContainer && activeElement) {
+                    const containerRect = tocContainer.getBoundingClientRect();
+                    const elementRect = activeElement.getBoundingClientRect();
+                    
+                    if (elementRect.top < containerRect.top || elementRect.bottom > containerRect.bottom) {
+                        activeElement.scrollIntoView({ block: 'center', behavior: 'smooth' });
+                    }
+                }
+            }
+        });
+    }
+
+    /* 左侧列表点击无刷新：文字 + 整行 */
+    layui.use(['jquery'], function ($) {
+        // 文字点击
+        $('#series-menu a').on('click', function (e) {
+            e.preventDefault();
+            loadArticle($(this).data('pk'));
+        });
+
+        // 整行（li）点击
+        $('#series-menu li').on('click', function (e) {
+            // 如果点的已经是 a，就不管；否则帮它触发
+            if (e.target.tagName.toLowerCase() === 'a') return;
+            const pk = $(this).find('a').data('pk');
+            loadArticle(pk);
+        });
+        
+        // 目录点击平滑滚动
+        $(document).on('click', '.toc-link', function (e) {
+            e.preventDefault();
+            const targetId = $(this).attr('href');
+            const $target = $(targetId);
+            
+            if ($target.length) {
+                $('html, body').animate({
+                    scrollTop: $target.offset().top - 80
+                }, 400);
+            }
+        });
+        
+        // 滚动时更新高亮（使用节流优化性能）
+        let scrollTimer = null;
+        $(window).on('scroll', function () {
+            if (scrollTimer) clearTimeout(scrollTimer);
+            scrollTimer = setTimeout(function() {
+                highlightCurrentSection();
+                updateReadingProgress();
+            }, 50);
+        });
+    });
+
+    /* 阅读进度条 */
+    function updateReadingProgress() {
+        const winScroll = document.documentElement.scrollTop || document.body.scrollTop;
+        const height = document.documentElement.scrollHeight - document.documentElement.clientHeight;
+        const scrolled = (winScroll / height) * 100;
+        
+        layui.use('jquery', function($) {
+            $('#readingProgress').css('width', scrolled + '%');
+        });
+    }
+
+    /* 首屏就生成目录 */
+    {% if article %} 
+    layui.use('jquery', function($) {
+        $(document).ready(function() {
+            setTimeout(function() {
+                buildToc();
+                highlightCurrentSection();
+                updateReadingProgress();
+                console.log('✅ 系列文章页初始化完成');
+            }, 100);
+        });
+    });
+    {% endif %}
+</script>
 {% endblock %}

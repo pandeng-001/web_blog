@@ -6,14 +6,12 @@
     <div class="layui-row layui-col-space20">
         <!-- 左侧目录 -->
         <div class="layui-col-md3">
-            <!-- 直接在这里设置sticky，不要额外包裹 -->
             <div class="toc-container">
                 <div class="layui-card toc-card">
                     <div class="layui-card-header" style="font-weight:bold;background:#f8f8f8;">
                         <i class="layui-icon layui-icon-list"></i> 文章目录
                     </div>
                     <div class="layui-card-body" id="toc" style="padding:15px;">
-                        <!-- 由 JS 自动生成目录 -->
                         <div style="text-align:center;color:#999;padding:20px 0;">
                             <i class="layui-icon layui-icon-loading layui-anim layui-anim-rotate layui-anim-loop"></i>
                             <div>加载目录中...</div>
@@ -73,12 +71,12 @@
        目录固定样式 - 关键修复
     ============================================ */
     .toc-container {
-        position: -webkit-sticky; /* Safari 兼容 */
+        position: -webkit-sticky;
         position: sticky;
-        top: 20px; /* 距离顶部的距离，根据实际情况调整 */
-        align-self: flex-start; /* 重要：让sticky在flex布局中生效 */
-        max-height: calc(100vh - 40px); /* 最大高度 */
-        overflow-y: auto; /* 内容过多时可滚动 */
+        top: 20px;
+        align-self: flex-start;
+        max-height: calc(100vh - 40px);
+        overflow-y: auto;
         z-index: 99;
     }
 
@@ -166,7 +164,7 @@
         margin-bottom: 15px;
         font-weight: bold;
         color: #2c3e50;
-        scroll-margin-top: 80px; /* 锚点跳转时的偏移 */
+        scroll-margin-top: 80px;
     }
 
     .markdown-body h1 { 
@@ -271,13 +269,36 @@
     }
 
     /* ============================================
-       响应式设计
+       响应式设计 - 🔥 修复手机端宽度不一致问题
     ============================================ */
     @media screen and (max-width: 768px) {
         .toc-container {
-            position: static; /* 移动端取消固定 */
+            position: static;
             max-height: none;
             margin-bottom: 15px;
+        }
+
+        .layui-container {
+            padding-left: 15px !important;
+            padding-right: 15px !important;
+        }
+
+        .layui-row.layui-col-space20 {
+            margin: 0 !important;
+        }
+
+        .layui-col-md3,
+        .layui-col-md9 {
+            width: 100% !important;
+            padding: 0 !important;
+            margin-bottom: 15px;
+        }
+
+        .toc-card,
+        .article-card {
+            width: 100%;
+            margin-left: 0;
+            margin-right: 0;
         }
 
         .markdown-body {
@@ -288,6 +309,30 @@
         .article-card .layui-card-header h1 {
             font-size: 22px !important;
         }
+
+        .article-card .layui-card-header {
+            padding: 15px !important;
+        }
+
+        .article-card .layui-card-header div {
+            font-size: 12px !important;
+        }
+
+        .toc-card .layui-card-body {
+            padding: 10px !important;
+        }
+
+        #toc a {
+            font-size: 12px;
+            padding: 6px 0 6px 8px;
+        }
+
+        #toc a[data-level="1"] { padding-left: 8px; }
+        #toc a[data-level="2"] { padding-left: 20px; }
+        #toc a[data-level="3"] { padding-left: 32px; }
+        #toc a[data-level="4"] { padding-left: 44px; }
+        #toc a[data-level="5"] { padding-left: 56px; }
+        #toc a[data-level="6"] { padding-left: 68px; }
     }
 
     /* 页面加载动画 */
@@ -306,17 +351,16 @@
         }
     }
 </style>
+{% endblock %}
 
-<!-- JavaScript 功能 -->
-<script src="{% static 'layui-v2.11.6/layui/layui.js' %}"></script>
+{% block extra_js %}
+<!-- 🔥 不要再次引入 layui.js，直接使用 -->
 <script>
     layui.use(['jquery'], function ($) {
         const $toc = $('#toc');
         const $articleContent = $('#articleContent');
         
-        // ============================================
-        // 功能1: 生成目录
-        // ============================================
+        // 生成目录
         function generateTOC() {
             const headers = $articleContent.find('h1, h2, h3, h4, h5, h6');
             
@@ -333,10 +377,8 @@
                 const id = this.id || 'heading-' + idx;
                 const text = $header.text();
                 
-                // 设置ID（用于锚点跳转）
                 $header.attr('id', id);
                 
-                // 创建目录链接
                 const $link = $('<a></a>')
                     .attr('href', '#' + id)
                     .attr('data-level', level)
@@ -350,9 +392,7 @@
             console.log('✅ 目录生成成功，共 ' + headers.length + ' 个标题');
         }
         
-        // ============================================
-        // 功能2: 平滑滚动跳转
-        // ============================================
+        // 平滑滚动跳转
         $(document).on('click', '.toc-link', function (e) {
             e.preventDefault();
             const targetId = $(this).attr('href');
@@ -365,9 +405,7 @@
             }
         });
         
-        // ============================================
-        // 功能3: 高亮当前阅读位置
-        // ============================================
+        // 高亮当前阅读位置
         function highlightCurrentSection() {
             const headers = $articleContent.find('h1, h2, h3, h4, h5, h6');
             const scrollTop = $(window).scrollTop();
@@ -382,15 +420,12 @@
                 }
             });
             
-            // 移除所有active类
             $('.toc-link').removeClass('active');
             
-            // 添加active类到当前标题
             if (currentId) {
                 const $activeLink = $('.toc-link[data-id="' + currentId + '"]');
                 $activeLink.addClass('active');
                 
-                // 自动滚动目录，确保当前项可见
                 const tocContainer = $('.toc-container')[0];
                 const activeElement = $activeLink[0];
                 if (tocContainer && activeElement) {
@@ -404,16 +439,14 @@
             }
         }
         
-        // 滚动时更新高亮（使用节流优化性能）
+        // 滚动时更新高亮
         let scrollTimer = null;
         $(window).on('scroll', function () {
             if (scrollTimer) clearTimeout(scrollTimer);
             scrollTimer = setTimeout(highlightCurrentSection, 50);
         });
         
-        // ============================================
-        // 功能4: 阅读进度条
-        // ============================================
+        // 阅读进度条
         function updateReadingProgress() {
             const winScroll = document.documentElement.scrollTop || document.body.scrollTop;
             const height = document.documentElement.scrollHeight - document.documentElement.clientHeight;
@@ -424,83 +457,15 @@
         
         $(window).on('scroll', updateReadingProgress);
         
-        // ============================================
         // 初始化
-        // ============================================
         $(document).ready(function () {
-            // 确保DOM完全加载后再执行
             setTimeout(function() {
                 generateTOC();
                 highlightCurrentSection();
                 updateReadingProgress();
                 console.log('✅ 文章详情页初始化完成');
-                console.log('📍 sticky定位已启用');
             }, 100);
         });
     });
 </script>
-
-<script>
-// 🔥 放在最前面，诊断 sticky 失效原因
-layui.use('jquery', function($) {
-    $(document).ready(function() {
-        setTimeout(function() {
-            const $toc = $('.toc-container');
-            if (!$toc.length) {
-                console.error('❌ 找不到 .toc-container 元素');
-                return;
-            }
-            
-            console.log('=== 🔍 Sticky 完整诊断 ===');
-            
-            // 检查自身样式
-            const tocStyle = window.getComputedStyle($toc[0]);
-            console.log('1️⃣ 目录自身:');
-            console.log('  position:', tocStyle.position);
-            console.log('  top:', tocStyle.top);
-            console.log('  z-index:', tocStyle.zIndex);
-            console.log('  display:', tocStyle.display);
-            
-            // 🔥 检查所有父元素的 overflow
-            console.log('\n2️⃣ 检查父元素 overflow (这是最常见的问题):');
-            let element = $toc[0];
-            let level = 0;
-            
-            while (element.parentElement) {
-                element = element.parentElement;
-                const style = window.getComputedStyle(element);
-                const overflow = style.overflow;
-                const overflowX = style.overflowX;
-                const overflowY = style.overflowY;
-                
-                if (overflow !== 'visible' || overflowX !== 'visible' || overflowY !== 'visible') {
-                    console.error(`  ❌ ${element.tagName}.${element.className}`);
-                    console.error(`     overflow: ${overflow}, overflowX: ${overflowX}, overflowY: ${overflowY}`);
-                } else {
-                    console.log(`  ✅ ${element.tagName}.${element.className} - overflow: visible`);
-                }
-                
-                level++;
-                if (level > 10) break; // 防止无限循环
-            }
-            
-            // 检查父元素高度
-            console.log('\n3️⃣ 检查父元素高度:');
-            const $parent = $toc.parent();
-            console.log('  父元素高度:', $parent.height(), 'px');
-            console.log('  目录高度:', $toc.height(), 'px');
-            console.log('  父元素必须 > 目录高度:', $parent.height() > $toc.height());
-            
-            // 检查 flex 布局
-            console.log('\n4️⃣ 检查 Flex 布局:');
-            const parentStyle = window.getComputedStyle($parent[0]);
-            console.log('  父元素 display:', parentStyle.display);
-            console.log('  align-self:', tocStyle.alignSelf);
-            
-            console.log('\n=== 诊断完成 ===\n');
-        }, 500);
-    });
-});
-</script>
-
 {% endblock %}
