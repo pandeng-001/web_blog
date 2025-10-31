@@ -52,7 +52,18 @@ class Article(models.Model):
     summary    = models.CharField('abstract', max_length=255, blank=True)       # 摘要
     content_md = models.TextField('content')                                    # 正文
     content_html = models.TextField('con_HTML', editable=False, blank=True)     # 渲染后html
-    cover      = models.ImageField('img', upload_to='covers/', blank=True)      # 题图
+    # cover      = models.ImageField('img', upload_to='covers/', blank=True)      # 题图
+    cover = models.ImageField(
+    'img', 
+    upload_to='covers/',  # 自动按年月分类
+    blank=True,
+    help_text=""" 
+    图片将保存至: /media/covers/图片名称，例如:![picture 1](/media/covers/example.jpg)<br><br>
+    或者保存至(下面的article images): /media/article/今年时间/今年月份/图片名称，例如:<br><br>
+    ![picture 1](/media/article/2024/09/example.jpg)
+    """
+    )
+
     category   = models.ForeignKey(Category, on_delete=models.CASCADE, related_name='articles', null=True) # 文章类别
     series       = models.ForeignKey(Series, on_delete=models.SET_NULL, null=True, blank=True, related_name='articles')
     series_order = models.PositiveSmallIntegerField('series_order', default=0, help_text='0=首位')
